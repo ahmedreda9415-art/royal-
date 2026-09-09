@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The clinic's shared operational data — any signed-in staff member can
+    // read and write it.
+    match /clinic/main {
+      allow read, write: if request.auth != null;
+    }
+
+    // Login accounts + roles. Anyone signed in can read the list (needed to
+    // show names). A user can create their OWN account doc once (signup).
+    // Only an existing partner can change roles or manage other accounts.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (
+        request.auth.uid == uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'partner'
+      );
+      allow update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'partner';
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
